@@ -103,7 +103,7 @@ it.each(languages)("keeps application-record loading/error and paused recovery l
  view.rerender(<ParentLocaleProvider initialLocale={locale}><ApplicationWorkspace request={request} history={{data,loading:false,error:new Error("Original provider error"),reload}}>{null}</ApplicationWorkspace></ParentLocaleProvider>);
  fireEvent.click(screen.getByRole("button",{name:text(locale,"Check application records again")}));expect(reload).toHaveBeenCalledTimes(1);
  view.rerender(<ParentLocaleProvider initialLocale={locale}><ApplicationWorkspace request={{...request,status:"paused"}} history={{data,loading:false,error:null,reload}}>{null}</ApplicationWorkspace></ParentLocaleProvider>);
- expect(screen.getByText(text(locale,"Work is paused or finished"))).toBeTruthy();
+ expect(screen.getByRole("heading", { name: text(locale, "Paused by you") })).toBeTruthy();
 });
 it("keeps a utility-only interface on its existing language boundary",async()=>{
  api();render(<ParentLocaleProvider initialLocale="es"><ParentIntake initialNeed="electricity"/></ParentLocaleProvider>);
@@ -171,7 +171,7 @@ describe("v3 running and queued progress source language",()=>{
   render(<ParentLocaleProvider initialLocale={locale}><ApplicationWorkspace request={request} progress={{state,summary,updatedAt:request.updated_at,nextRunAt:null,canContinueAfterClosing:true}} history={{data:{operations:[],historyLimited:false},loading:false,error:null,reload:vi.fn()}}>{null}</ApplicationWorkspace></ParentLocaleProvider>);
   const detail=screen.getByText((_,node)=>node?.tagName==="P"&&!!node.textContent?.startsWith(text(locale,summary)));
   expect(detail.closest("[lang]")?.getAttribute("lang")).toBe(locale);
-  if(state==="running") { expect(detail.textContent).toContain(text(locale,"Program progress shows recorded next steps. Opening a public website does not mean CaseLink is filling in or submitting an application.")); expect(detail.textContent).not.toContain(text(locale,"The Official website section shows the official site connection and any recorded blocker.")); }
+  if (state === "running") expect(detail.textContent).toBe(text(locale, summary));
  });
  it.each(languages.flatMap(locale=>(["running","queued"] as const).map(state=>({locale,state}))))("preserves unknown $state narrative and language in $locale",({locale,state})=>{
   const request=fixtureRequest();request.intake.needs=["snap_pending"];

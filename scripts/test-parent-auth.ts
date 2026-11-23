@@ -250,18 +250,26 @@ async function main() {
   async function showSection(page: Page, section: string) {
     await page.getByRole("navigation", { name: "Your application checklist" }).locator(`a[href="#${section}"]`).click();
   }
-  async function startFoodRequest(page: Page) {
+  async function answerFoodQuestions(page: Page, zip: string, benefits: "applied" | "never") {
     await page.goto(`${origin}/get-support?need=food`, {
       waitUntil: "networkidle",
     });
-    await page.getByLabel(/enough food for today and tomorrow/).selectOption("no");
-    await page.getByLabel(/help paying for groceries/).selectOption("applied");
+    await page.getByRole("radio", { name: "Yes", exact: true }).check();
+    await page.getByLabel("ZIP code", { exact: true }).fill(zip);
+    await page.getByRole("button", { name: "Find support", exact: true }).click();
+    await page.getByRole("button", { name: "Food or SNAP", exact: true }).click();
+    await page.locator('#food-guide-enough input[value="no"]').check();
+    await page.getByText("Explore help paying for groceries", { exact: true }).click();
+    await page.locator(`#food-guide-history input[value="${benefits}"]`).check();
     await page.getByRole("button", { name: "See my options", exact: true }).click();
+  }
+  async function startFoodRequest(page: Page) {
+    await answerFoodQuestions(page, "19129", "applied");
     await page.getByRole("button", { name: "Food for now", exact: true }).click();
     await page.getByLabel("Household ZIP code").waitFor();
-    check(await page.getByLabel("Request timing").inputValue() === "today" &&
+    check(await page.getByLabel("Household ZIP code").inputValue() === "19129" &&
       page.url() === `${origin}/get-support?need=food`,
-    "The actual guided shortage proposes today's priority without putting household answers in the URL.");
+    "The actual guided shortage reuses the start ZIP without putting household answers in the URL.");
     await page.getByLabel("Household ZIP code").fill("");
     await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
@@ -541,10 +549,7 @@ async function main() {
 
       stage = "actual guided combined food and pending SNAP start";
       const mixedPage = await first.context.newPage();
-      await mixedPage.goto(`${origin}/get-support?need=food`, { waitUntil: "networkidle" });
-      await mixedPage.getByLabel(/enough food for today and tomorrow/).selectOption("no");
-      await mixedPage.getByLabel(/help paying for groceries/).selectOption("applied");
-      await mixedPage.getByRole("button", { name: "See my options", exact: true }).click();
+      await answerFoodQuestions(mixedPage, "19129", "applied");
       await mixedPage.getByRole("button", { name: "Continue with both options", exact: true }).click();
       await mixedPage.getByLabel("Household ZIP code").fill("19129");
       await mixedPage.getByRole("checkbox", { name: /I’m 18 or older/ }).check();
@@ -771,8 +776,9 @@ async function main() {
       const deadline = (await (await descriptionOwner.page.request.get(`${origin}/api/parent/authorization-window`)).json()).authorization.expiresAt as string;
       const anon = await browser.newContext({ baseURL: origin }); contexts.push(anon); const anonPage = await anon.newPage();
       await anonPage.goto(`${origin}/get-support`, { waitUntil: "networkidle" });
-      check(await anonPage.getByRole("link", { name: "Find food now", exact: true }).isVisible()
-        && await anonPage.getByLabel(/enough food for today and tomorrow/).isVisible(), "The actual anonymous guide retains urgent official food help and manual questions with optional interpretation closed.");
+      check(await anonPage.getByRole("link", { name: "Find urgent food or utility help", exact: true }).isVisible()
+        && await anonPage.getByRole("group", { name: "Do you need help today?", exact: true }).isVisible()
+        && await anonPage.locator("#food-description-entry").count() === 0, "The actual anonymous guide retains urgent food help and manual routing with optional interpretation closed.");
       check((await anonPage.request.get(`${descriptionUrl}/availability`)).status() === 200 && !(await (await anonPage.request.get(`${descriptionUrl}/availability`)).json()).available,
         "New optional interpretation is actually unavailable before any fixture-specific purpose approval.");
       const deniedCreate = { action: "create", expectedOwnerId: descriptionOwner.id, idempotencyKey: randomUUID(), noticeVersion: FOOD_DESCRIPTION_NOTICE_VERSION, consentAccepted: true };
@@ -2213,10 +2219,7 @@ async function main() {
       const profileSaved = await first.page.request.post(profileUrl, { headers: { origin, "Idempotency-Key": randomUUID() }, data: profileWrite });
       check(profileSaved.status() === 201 && (await profileSaved.json()).revision === 1, "The real owned API saves explicitly consented reusable family basics.");
       const originalProfile = (await readProfile()).profile!;
-      await first.page.goto(`${origin}/get-support?need=food`, { waitUntil: "networkidle" });
-      await first.page.getByLabel("Do you have enough food for today and tomorrow?").selectOption("no");
-      await first.page.getByLabel(/Do you get help paying for groceries/).selectOption("never");
-      await first.page.getByRole("button", { name: "See my options", exact: true }).click();
+      await answerFoodQuestions(first.page, "19104", "never");
       await first.page.getByRole("button", { name: "Continue with both options", exact: true }).click();
       await first.page.waitForFunction(() => (document.querySelector('[data-snap-path="applicant.firstName"]') as HTMLInputElement | null)?.value === "AuthProfileCanary");
       check(await first.page.getByLabel("Your last name").inputValue() === "Parent" && await first.page.getByLabel("Your date of birth").inputValue() === "1988-04-15" &&

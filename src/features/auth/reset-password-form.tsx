@@ -153,7 +153,7 @@ export function ResetPasswordForm() {
   if (status === "invalid") return (
     <div className="space-y-4">
       <p className={alertErrorClass} role="alert">{t(error ?? "This reset link is invalid or expired. Request a new password reset email to continue.")}</p>
-      <div className="flex justify-center"><Link href="/forgot-password" className="font-medium text-[var(--public-accent)] underline-offset-2 hover:underline">{t("Request a new reset link")}</Link></div>
+      <div className="flex justify-center"><Link href={provided ? parentRecoveryHref("/forgot-password", locale) : "/forgot-password"} className="font-medium text-[var(--public-accent)] underline-offset-2 hover:underline">{t("Request a new reset link")}</Link></div>
     </div>
   );
 

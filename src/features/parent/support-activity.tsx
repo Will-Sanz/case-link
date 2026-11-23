@@ -76,6 +76,13 @@ export function recordedReceipt(operation: Pick<RecordedOperation, "state" | "ev
   });
   return receipt.success && receipt.data.reference.trim() ? receipt.data : null;
 }
+export const RECORDED_RECEIPT_SOURCES = {
+  agency_receipt: "Agency receipt",
+  provider_api: "Program system record",
+  authenticated_partner: "Partner confirmed",
+  operator_confirmed: "Operator confirmed",
+} as const;
+
 export type OperationHistory = {
   data: { operations: RecordedOperation[]; historyLimited: boolean } | null;
   loading: boolean;
@@ -201,13 +208,14 @@ export function SupportActivity({
   }
   return (
     <>
-      {!!data?.operations?.length && (
+      {!error && !!data?.operations?.length && (
         <section lang={localized ? locale : "en"} className={`${styles.surface} ${wicOnly ? wicStyles.activity : ""}`}>
           <h2>{t("Recorded packets & receipts")}</h2>
           <p className={styles.hint}>{t("Each download keeps the exact information and evidence recorded for that attempt.")}</p>
           <ul className={styles.packetList}>
-            {data.operations.map((operation) => (
-              <li key={operation.id}>
+            {data.operations.map((operation) => {
+              const receipt = recordedReceipt(operation);
+              return <li key={operation.id}>
                 <strong lang="en">
                   {getProgram(operation.program_id)?.name ?? "Named program"}
                 </strong>
@@ -221,6 +229,13 @@ export function SupportActivity({
                     : OUTCOME_LABELS[operation.state as OutcomeState] ??
                       "Needs verification")}{" "}{t("·")}{" "}{displayDate(operation.created_at, false, localized ? locale : "en")}
                 </p>
+                {receipt && <div className={styles.receiptDetails}>
+                  <p><strong>{t("Recorded reference:")}</strong>{" "}<bdi>{receipt.reference}</bdi></p>
+                  <p className={styles.hint}>
+                    {t(RECORDED_RECEIPT_SOURCES[receipt.source])} ·{" "}
+                    <time dateTime={receipt.recordedAt}>{displayDate(receipt.recordedAt, true, localized ? locale : "en")}</time>{" "}{t("(Eastern time)")}
+                  </p>
+                </div>}
                 <a
                   className={styles.textLink}
                   lang={operation.need?.startsWith("wic_") || operation.need?.startsWith("snap_") || operation.need === "food_now" ? locale : "en"}
@@ -240,8 +255,8 @@ export function SupportActivity({
                     </a>
                   </p>
                 )}
-              </li>
-            ))}
+              </li>;
+            })}
           </ul>
           {data.historyLimited && (
             <p className={`${styles.hint} ${styles.space}`}>{t("Showing the latest 100 recorded operations. Earlier submissions or uncertain deliveries may not appear here.")}{" "}

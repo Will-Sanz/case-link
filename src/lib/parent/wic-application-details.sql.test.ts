@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createParentSqlFixture } from "../../../scripts/parent-sql-fixture";
 import { fixtureIntake, fixtureMandate } from "./test-fixtures";
 import { WIC_APPLICATION_NOTICE_VERSION as notice, WIC_SUBJECT_AUTHORITY_STATEMENT } from "./constants";
 import { WIC_APPLICATION_SOURCE, wicApplicationFieldsValueSchema, wicApplicationLeaves } from "./wic-application-fields";
 
 const modulePath = process.env.CASELINK_PARENT_SQL_FIXTURE_MODULE;
+const rehearsalTime = new Date("2026-11-19T12:00:00.000Z");
 describe.skipIf(!modulePath)("default-off private WIC revisions against PostgreSQL", () => {
   let fixture: Awaited<ReturnType<typeof createParentSqlFixture>>;
   let owner: string, session: string;
@@ -36,9 +37,15 @@ describe.skipIf(!modulePath)("default-off private WIC revisions against PostgreS
   async function state(request: string) {
     return (await fixture.admin.query("select r.*,(select row_to_json(j) from public.parent_jobs j where j.request_id=r.id) job,(select count(*)::int from public.parent_events e where e.request_id=r.id) events from public.parent_requests r where r.id=$1", [request])).rows[0];
   }
-  beforeAll(async () => { fixture = await createParentSqlFixture(modulePath!); });
-  afterAll(async () => { await fixture?.admin.end(); });
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(rehearsalTime);
+    fixture = await createParentSqlFixture(modulePath!);
+    expect(new Date((await fixture.admin.query("select now() value")).rows[0].value).toISOString()).toBe(rehearsalTime.toISOString());
+  });
+  afterAll(async () => { await fixture?.admin.end(); vi.useRealTimers(); });
   beforeEach(async () => {
+    vi.setSystemTime(rehearsalTime);
     owner = randomUUID(); session = randomUUID();
     await fixture.admin.query("update parent_private.processing_controls set enabled=true,approval_reference='isolated test',approved_until=now()+interval '1 day',existing_accounts_enabled=true");
     await gate(false);
@@ -64,6 +71,22 @@ describe.skipIf(!modulePath)("default-off private WIC revisions against PostgreS
     const expected = (await fixture.admin.query("select least(approved_until,wic_details_approved_until,'2026-11-20T18:57:45.283Z'::timestamptz) expiry from parent_private.processing_controls")).rows[0].expiry;
     expect(response.collectionEnabled).toBe(true); expect(new Date(response.expiresAt).toISOString()).toBe(new Date(expected).toISOString());
     expect(Object.keys(response).sort()).toEqual(["collectionEnabled", "expiresAt", "noticeVersion"]);
+  });
+
+  it("closes at the verified source deadline even while both approvals remain current", async () => {
+    const request = await start({}, { expiresAt: "2026-11-21T12:00:00.000Z" });
+    await gate();
+    await fixture.admin.query("update parent_private.processing_controls set approved_until=now()+interval '3 days',wic_details_approved_until=now()+interval '3 days'");
+    await fixture.admin.query("update auth.sessions set not_after=now()+interval '3 days' where id=$1", [session]);
+    const expiry = Date.parse(WIC_APPLICATION_SOURCE.verifiedUntil);
+    vi.setSystemTime(expiry - 1);
+    const current = (await query("select public.parent_wic_application_collection() value")).rows[0].value;
+    expect(current.collectionEnabled).toBe(true);
+    expect(new Date(current.expiresAt).toISOString()).toBe(WIC_APPLICATION_SOURCE.verifiedUntil);
+    vi.setSystemTime(expiry);
+    expect((await query("select public.parent_wic_application_collection() value")).rows[0].value).toEqual({ collectionEnabled: false, noticeVersion: null, expiresAt: null });
+    await expect(save(request, details())).rejects.toMatchObject({ code: "42501" });
+    expect(await read(request)).toEqual([]);
   });
 
   it("stores exact immutable owned values/provenance without ZIP, ordinary facts or worker/model exposure", async () => {

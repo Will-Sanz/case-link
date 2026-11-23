@@ -1,6 +1,7 @@
 "use client";
-import { ParentLanguageSelector, useParentLocale } from "./parent-locale";
+import { ParentDisplaySettings, useParentLocale } from "./parent-locale";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
 import { ChatGptFuturesBanner } from "@/components/brand/chatgpt-futures-banner";
@@ -19,8 +20,9 @@ export function ParentShell({
   signedIn?: boolean;
 }) {
   const { t } = useParentLocale();
+  const pathname = usePathname();
   return (
-    <div className={`${styles.shell} ${chatStyles.shell}`}>
+    <div className={styles.shell}>
       <a className={styles.skip} href="#main-content">
         {t("Skip to content")}</a>
       {showRecognition && <div lang="en"><ChatGptFuturesBanner /></div>}
@@ -31,11 +33,11 @@ export function ParentShell({
           </Link>
           <ParentNavigation signedIn={signedIn} />
         </div>
-        <div className={styles.container}><ParentLanguageSelector /></div>
       </header>
       <main id="main-content" lang="en" tabIndex={-1} className={styles.main}>
         {children}
       </main>
+      {pathname !== "/get-support" && <div lang="en" className={chatStyles.dock}><FloatingAssistant signedIn={signedIn} /></div>}
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
@@ -50,11 +52,11 @@ export function ParentShell({
             <Link href="/support/privacy">{t("Privacy policy")}</Link>
             <Link href="/support/terms">{t("Terms of service")}</Link>
             <Link href="/support/help">{t("Get help")}</Link>
+            <ParentDisplaySettings className={styles.footerSettings} />
             <a href="mailto:willsanz23@gmail.com">{t("Contact CaseLink")}</a>
           </nav>
         </div>
       </footer>
-      <div lang="en"><FloatingAssistant signedIn={signedIn} /></div>
     </div>
   );
 }

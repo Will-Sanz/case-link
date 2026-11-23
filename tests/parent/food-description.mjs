@@ -1,3 +1,4 @@
+import { chooseScreenLanguage } from "./screen-language.mjs";
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
@@ -133,7 +134,7 @@ try {
     }
     async function changeLocale(value) {
       const refresh = page.waitForResponse(response => response.request().headers().rsc === '1' && new URL(response.url()).pathname === '/get-support');
-      await page.getByLabel(/Screen language|Idioma de pantalla/).selectOption(value); await refresh; await page.waitForLoadState('networkidle');
+      await chooseScreenLanguage(page, value); await refresh; await page.waitForLoadState('networkidle');
     }
     if (mode !== 'new') {
       await page.goto(origin + '/get-support'); await page.getByText(c.history, { exact: true }).click(); await page.getByRole('button', { name: new RegExp(c.resume) }).click();
@@ -153,11 +154,11 @@ try {
       await check('only-uncovered-scope-before-mandate'); assert.equal(starts.length, 0); assert.equal(queues.length, 0); assert.equal(resolves.length, 0);
       assert.deepEqual(errors, []); assert.deepEqual(outside, []); await context.close(); continue;
     }
-    await page.goto(origin + '/get-support'); await page.getByLabel(q.enough, { exact: true }).waitFor();
+    await page.goto(origin + '/get-support'); await page.getByRole("group", { name: q.enough, exact: true }).waitFor();
     assert.equal(await page.locator('#food-description-text').count(), 0); assert.equal(queues.length, 0); await check('closed-manual');
     enabled = true; await page.reload(); await page.getByRole('button', { name: c.signIn, exact: true }).click();
     await page.getByRole('button', { name: c.manual, exact: true }).waitFor(); assert.equal(queues.length, 0); await check('optional-auth-exit');
-    await page.getByRole('button', { name: c.manual, exact: true }).click(); await page.getByLabel(q.enough, { exact: true }).waitFor();
+    await page.getByRole('button', { name: c.manual, exact: true }).click(); await page.getByRole("group", { name: q.enough, exact: true }).waitFor();
     signedIn = true; await page.reload(); await page.getByRole('button', { name: c.create, exact: true }).click();
     assert.equal(await page.locator('#food-description-text').count(), 0); assert.ok(await page.getByRole('button', { name: c.create, exact: true }).isDisabled()); await page.getByText(c.notice, { exact: true }).click(); await check('consent-before-text');
     await page.getByRole('checkbox', { name: c.consent, exact: true }).focus(); await page.keyboard.press('Space');
@@ -168,13 +169,13 @@ try {
     const other = locale === 'en' ? 'es' : 'en'; await changeLocale(other); await page.getByRole('button', { name: foodDescriptionCopy[other].retry, exact: true }).click();
     await page.getByText(foodDescriptionCopy[other].waiting, { exact: true }).waitFor(); assert.equal(queues.length, 2); await changeLocale(locale); await check('saved-waiting');
     draft = { ...draft, state: 'result', selection: { needIds: ['food_now'], selections: [], assertions: [], exclusions: [], questionIds: ['benefitHistory'], outOfScope: null } };
-    await page.evaluate(() => window.dispatchEvent(new Event('focus'))); const history = page.getByLabel(q.history, { exact: true }); await history.waitFor();
-    assert.equal(await page.getByLabel(q.enough, { exact: true }).count(), 0); await page.waitForFunction(() => document.activeElement?.id === 'food-guide-results'); await check('ready-food-optional-question');
-    await history.selectOption('applied');
-    if (routingOnly) { await page.locator('[aria-labelledby="food-description-title"] p').filter({hasText:q.applied}).waitFor(); await check('current-routing-choice',true); assert.equal(resolves.length,0); await context.close(); continue; }
+    await page.evaluate(() => window.dispatchEvent(new Event('focus'))); const history = page.locator('#food-guide-history input[value=applied]'); await history.waitFor();
+    assert.equal(await page.getByRole("group", { name: q.enough, exact: true }).count(), 0); await page.waitForFunction(() => document.activeElement?.id === 'food-guide-results'); await check('ready-food-optional-question');
+    await history.check();
+    if (routingOnly) { assert.equal(await history.isChecked(), true); await check('current-routing-choice',true); assert.equal(resolves.length,0); await context.close(); continue; }
     await page.getByRole('button', { name: c.resolve, exact: true }).click(); await page.getByRole('button', { name: c.resolveRetry, exact: true }).waitFor(); await check('clarification-unknown');
     await page.getByRole('button', { name: c.resolveRetry, exact: true }).click(); await page.getByRole('button', { name: q.both, exact: true }).waitFor(); assert.equal(resolves.length, 2); await check('vetted-options', width === 320);
-    await page.getByRole('button', { name: c.changeAnswers, exact: true }).click(); await page.getByLabel(q.enough, { exact: true }).waitFor(); await check('change-understood-answers');
+    await page.getByRole('button', { name: c.changeAnswers, exact: true }).click(); await page.getByRole("group", { name: q.enough, exact: true }).waitFor(); await check('change-understood-answers');
     await page.getByRole('button', { name: c.resolve, exact: true }).click(); await page.getByRole('button', { name: q.both, exact: true }).waitFor(); assert.equal(resolves.length, 3);
     await page.getByRole('button', { name: q.both, exact: true }).click(); await page.locator('#support-zip').waitFor();
     const screenLocale = await page.locator('#support-zip').evaluate(node => node.closest('[lang]')?.getAttribute('lang')); assert.equal(screenLocale, locale);

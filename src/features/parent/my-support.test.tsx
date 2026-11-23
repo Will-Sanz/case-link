@@ -7,7 +7,6 @@ import type { SupportProgress } from "@/lib/parent/progress";
 import { MySupport } from "./my-support";
 import { ParentLocaleProvider } from "./parent-locale";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock("./family-profile", () => ({ FamilyProfileWelcome: () => null }));
 
 const request = fixtureRequest();
 const response = (state: SupportProgress["state"], requests: SupportRequest[] = [request]) => ({
@@ -198,4 +197,18 @@ describe("current support-list progress", () => {
     await show();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+});
+
+it("puts family actions first and preserves the overview for permission-only attention", async () => {
+  const actionRequest = {
+    ...request,
+    id: "33333333-3333-4333-8333-333333333333",
+    required_actions: [{ id: "example-step", need: "food_now" as const, reason: "missing_fact" as const, title: "Confirm your ZIP", explanation: "Check food locations." }],
+  };
+  const result = response("needs_parent", [request, actionRequest]);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(result));
+  await open();
+  const attention = screen.getByRole("region", { name: "Needs your attention" });
+  const links = Array.from(attention.querySelectorAll("a"), link => link.getAttribute("href"));
+  expect(links).toEqual([`/support/${request.id}`, `/support/${actionRequest.id}#your-next-steps`]);
 });

@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { ParentLanguageSelector, useParentLocale } from "@/features/parent/parent-locale";
+import { ParentDisplaySettings, useParentLocale } from "@/features/parent/parent-locale";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { CaseLinkWordmark } from "@/components/brand/caselink-mark";
@@ -12,6 +12,7 @@ export function AuthShell({
   children,
   footer,
   showLegalLinks = true,
+  recovery = false,
 }: {
   title: string;
   subtitle: string;
@@ -19,22 +20,23 @@ export function AuthShell({
   footer?: ReactNode;
   /** Privacy / Terms links below the card (auth flows). */
   showLegalLinks?: boolean;
+  recovery?: boolean;
 }) {
-  const { t, provided } = useParentLocale();
+  const { t } = useParentLocale();
   return (
     <main className={`${styles.shell} public-auth flex min-h-svh flex-col items-center justify-center px-4 py-16`}>
       <div className={`${styles.content} w-full max-w-[400px]`}>
         <div className="mb-7 text-center">
           <CaseLinkWordmark className="justify-center" />
-          <h1 className="sr-only">{title}</h1>
+          <h1 className={recovery ? styles.recoveryTitle : "sr-only"}>{t(title)}</h1>
           <p className="mt-3 text-sm leading-relaxed text-[var(--public-ink-muted)]">
             {t(subtitle)}
           </p>
         </div>
-        {provided && <ParentLanguageSelector />}
-        <Card className={`${styles.card} p-6`}>
+        <Card className={`${styles.card} ${recovery ? "p-5 sm:p-6" : "p-6"}`}>
           {children}
         </Card>
+        <ParentDisplaySettings className="mt-4 [&>summary]:min-h-11 [&>summary]:cursor-pointer [&>summary]:py-2 [&>summary]:text-sm [&>summary]:font-medium [&>div]:mt-3" />
         {showLegalLinks ? (
           <p className="mt-5 text-center text-xs text-[var(--public-ink-3)]">
             <Link

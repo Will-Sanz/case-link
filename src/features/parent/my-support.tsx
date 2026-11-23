@@ -9,7 +9,6 @@ import { displayDate } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
 import { ProgressBadge } from "./support-progress";
-import { FamilyProfileWelcome } from "./family-profile";
 import { useParentLocale } from "./parent-locale";
 import styles from "./parent.module.css";
 
@@ -50,50 +49,57 @@ export function MySupport() {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [hasOpenRequests, reloadIfIdle]);
+  const requests = data?.requests ?? [];
+  const progress = data?.progress ?? {};
+  const needsAttention = (request: SupportRequest) => request.status === "active" &&
+    (progress[request.id]?.state === "needs_parent" ||
+      (!progress[request.id] && requestStatus(request) === "A step needs you"));
+  const groups = [
+    { title: "Needs your attention", requests: requests.filter(needsAttention) },
+    { title: "In progress and recent updates", requests: requests.filter(request => !needsAttention(request)) },
+  ];
   return (
     <div lang={locale} className={styles.container}>
-      <div className={styles.pageTop}>
-        <div>
-          <h1>{t("My support")}</h1>
-          <p>
-            {t("A clear view of what’s happening, what comes next, and anything that needs you.")}
-          </p>
-        </div>
+      <div className={`${styles.pageTop} ${styles.supportListHeader}`}>
+        <h1>{t("My support")}</h1>
         <div className={styles.inline}>
           <button className={styles.quiet} onClick={reload} aria-label={t("Refresh support status")}>
             <Refresh width={17} height={17} aria-hidden="true" />
             {t("Refresh status")}
           </button>
-          <Link className={styles.button} href="/get-support">
+          {requests.length > 0 && <Link className={styles.secondary} href="/get-support">
             {t("Get more support")}{" "}
             <ArrowRight width={18} height={18} aria-hidden="true" />
-          </Link>
+          </Link>}
         </div>
       </div>
-      {data && !error && <div lang="en"><FamilyProfileWelcome/></div>}
       {loading ? (
         <ParentLoading />
       ) : error ? (
         <ServiceError error={error} retry={reload} />
-      ) : data?.requests.length ? (
-        <ul className={styles.list}>
-          {data.requests.map((request) => {
-            const summary = data.progress?.[request.id]?.summary ?? request.plan?.summary ??
+      ) : requests.length ? (
+        <div className={styles.requestGroups}>
+          {groups.filter(group => group.requests.length > 0).map(group => (
+            <section key={group.title} aria-label={t(group.title)}>
+              <h2>{t(group.title)}</h2>
+              <ul className={styles.list}>
+          {group.requests.map((request) => {
+            const summary = progress[request.id]?.summary ?? request.plan?.summary ??
               "Your request is saved. Application progress and your next step will appear here.";
             return (
             <li key={request.id}>
               <Link
                 className={styles.requestCard}
-                href={`/support/${request.id}`}
+                href={`/support/${request.id}${needsAttention(request) && requestStatus(request) === "A step needs you" ? "#your-next-steps" : ""}`}
               >
                 <div className={styles.between}>
-                  <h2>
+                  <h3>
                     {request.intake.needs
                       .map((need) => t(NEED_LABELS[need]))
                       .join(" · ")}
-                  </h2>
-                  {data.progress?.[request.id] ? (
-                    <ProgressBadge progress={data.progress[request.id]} />
+                  </h3>
+                  {progress[request.id] ? (
+                    <ProgressBadge progress={progress[request.id]} />
                   ) : (
                     <span
                       className={`${styles.badge} ${request.required_actions.some((a) => !a.resolved && (!a.resolver || a.resolver === "parent")) ? styles.badgeAttention : request.status !== "active" ? styles.badgeWait : ""}`}
@@ -123,7 +129,10 @@ export function MySupport() {
               </Link>
             </li>
           ); })}
-        </ul>
+              </ul>
+            </section>
+          ))}
+        </div>
       ) : (
         <div className={styles.empty}>
           <div className={styles.emptyIcon}>

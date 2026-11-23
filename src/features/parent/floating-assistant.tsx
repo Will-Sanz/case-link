@@ -246,7 +246,7 @@ export function FloatingAssistant({ signedIn }: { signedIn: boolean }) {
           </button>
         </header>
         <div className={chatStyles.body} key={`${signedIn}:${pathname}`}>
-          <button type="button" className={styles.quiet} onClick={() => { setOpen(false); setLauncherHidden(true); }}>{t("Hide floating button")}</button>
+          <button type="button" className={styles.quiet} onClick={() => { setOpen(false); setLauncherHidden(true); }}>{t("Hide assistant button")}</button>
           {opened &&
             (signedIn || requestId ? (
               <SavedRequestPicker onAction={close} initialRequestId={requestId} />

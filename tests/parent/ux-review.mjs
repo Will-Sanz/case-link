@@ -297,41 +297,30 @@ try {
       "main-content",
     );
     await snapshot("home");
-    await page.goto(`${origin}/get-support?need=food`, {
+    await page.goto(`${origin}/get-support`, {
       waitUntil: "networkidle",
     });
-    await page.getByText("I already know which program I need", { exact: true }).click();
-    await page.getByRole("link", { name: "Ask CaseLink for food-access support" }).click();
+    await snapshot("start");
+    await page.getByRole("radio", { name: "Yes", exact: true }).check();
+    await page.getByLabel("ZIP code", { exact: true }).fill("19129");
+    await page.getByRole("button", { name: "Find support", exact: true }).click();
+    await page.getByRole("button", { name: "Food or SNAP", exact: true }).click();
+    await page.locator('#food-guide-enough input[value="no"]').check();
+    await page.getByRole("button", { name: "See my options", exact: true }).click();
+    await page.getByRole("button", { name: "Food for now", exact: true }).click();
     await page.getByRole("button", { name: "Back", exact: true }).click();
-    await page.getByRole("checkbox", { name: /Food for now/ }).check();
+    await page.getByRole("button", { name: "See other support options", exact: true }).click();
+    await page.getByRole("button", { name: "Back to Get support", exact: true }).click();
+    await page.getByLabel("ZIP code", { exact: true }).fill("19104");
+    await page.getByRole("button", { name: "Find support", exact: true }).click();
+    await page.getByRole("button", { name: "Food or SNAP", exact: true }).click();
+    await page.getByRole("button", { name: "See my options", exact: true }).click();
+    await page.getByRole("button", { name: "Food for now", exact: true }).click();
+    assert.equal(await page.getByLabel("Household ZIP code").inputValue(), "19104");
     assert.equal(await page.getByLabel("Electric bill", { exact: true }).count(), 0);
-    await snapshot("needs");
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await page.getByLabel("Household ZIP code").fill("19104");
     await page.getByLabel(/18 or older/).check();
     const zipBox = await page.getByLabel("Household ZIP code").boundingBox();
-    const languageBox = await page
-      .getByLabel("Preferred service language")
-      .boundingBox();
-    assert.ok(
-      zipBox && languageBox,
-      "Both household routing fields must be rendered.",
-    );
-    assert.ok(
-      [zipBox.height, languageBox.height].every(
-        (value) => value >= 48 && value <= 54,
-      ),
-      "ZIP and language controls must have matching usable heights.",
-    );
-    assert.ok(
-      Math.abs(zipBox.height - languageBox.height) <= 2,
-      "Input and select control heights must align.",
-    );
-    if (width >= 600)
-      assert.ok(
-        Math.abs(zipBox.y - languageBox.y) <= 2,
-        "Help text must not push the adjacent language control out of alignment.",
-      );
+    assert.ok(zipBox && zipBox.height >= 48, "The ZIP field must have a usable target height.");
     await snapshot("details");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await snapshot("permission-review");

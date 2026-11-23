@@ -170,11 +170,37 @@
   color: inherit;
   text-underline-offset: 4px;
 }
+.footerSettings summary {
+  cursor: pointer;
+  width: fit-content;
+  min-height: 2.75rem;
+  padding-block: 0.4rem;
+}
+.footerSettings .field {
+  margin-top: 0.75rem;
+}
+.container.account {
+  max-width: 52rem;
+}
+.account .displaySettings {
+  padding: 0 0 1.25rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-rule);
+  border-radius: 0;
+  background: none;
+}
+.displaySettings select {
+  width: fit-content;
+  min-width: 10rem;
+}
 .container {
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
   padding: 2.5rem clamp(1.25rem, 4vw, 4rem) 4rem;
+}
+.container.intakePage {
+  max-width: 68rem;
 }
 .pageTop {
   margin-bottom: 2.5rem;
@@ -375,6 +401,9 @@
   .container.account,
   .account :is(.surface, .trustLine, .error, .success, .fieldset, a.secondary) {
     padding: 12px;
+  }
+  .account .displaySettings {
+    padding: 0 0 1.25rem;
   }
   .account .trustLine {
     flex-direction: column;
@@ -636,8 +665,20 @@
   gap: 0.8rem;
   text-align: center;
 }
-.heroDirectHelp {
-  display: none;
+.heroLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 1rem;
+}
+.heroLinks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-underline-offset: 4px;
 }
 .heroVisual {
   width: 100%;
@@ -653,63 +694,6 @@
   object-position: center 25%;
   mix-blend-mode: multiply;
 }
-.services {
-  width: calc(100% - 5rem);
-  max-width: none;
-  margin: -2.5rem auto 0;
-  position: relative;
-  z-index: 1;
-  padding: 1.6rem 2rem;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-feature);
-}
-.serviceChoice {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  padding: 0.5rem 1.75rem 0.5rem 0;
-  color: var(--color-ink);
-  text-decoration: none;
-}
-.serviceChoice strong {
-  display: block;
-  font-weight: 650;
-  font-size: 1.125rem;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
-}
-.serviceChoice div > span {
-  display: block;
-  margin-top: 0.4rem;
-  font-size: 0.875rem;
-  color: var(--color-ink-muted);
-}
-.serviceIcon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-.serviceChoice > svg {
-  flex: none;
-  margin-left: auto;
-  color: var(--color-accent);
-  transition: transform var(--dur-short) var(--ease-out);
-}
-.serviceChoice:hover strong {
-  color: var(--color-accent);
-}
-.serviceChoice:hover > svg {
-  transform: translateX(4px);
-}
-
 .serviceOptions {
   padding-block: 0;
 }
@@ -742,37 +726,23 @@
   gap: 0.75rem 1.5rem;
   margin-top: 1rem;
 }
+.resourceDetails .serviceLinks {
+  display: grid;
+  gap: 0;
+  margin-block: 0.75rem;
+}
+.resourceDetails .serviceLinks a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: 0.375rem;
+  border-top: 1px solid var(--color-rule);
+}
 @media (max-width: 760px) {
   .serviceOption {
     align-items: flex-start;
     flex-direction: column;
   }
-}
-.landingUrgent {
-  max-width: none;
-  margin: 2rem auto 3rem;
-  padding: 0 2.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-}
-.landingUrgent::before,
-.landingUrgent::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--color-rule);
-}
-.landingUrgent a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  color: var(--color-accent);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-decoration: none;
-  text-align: center;
 }
 .navAccount {
   color: var(--color-ink);
@@ -1136,6 +1106,10 @@
   padding: 0.6rem 0;
 }
 .programDescriptions,
+.receiptDetails {
+  padding-block: 0.4rem;
+  overflow-wrap: anywhere;
+}
 .packetList {
   list-style: none;
   padding: 0;
@@ -1186,7 +1160,17 @@
   border-color: var(--color-accent-rule);
   background: var(--color-surface);
 }
-.requestCard h2 {
+.pageTop.supportListHeader {
+  margin-bottom: 1.5rem;
+}
+.requestGroups {
+  display: grid;
+  gap: 2rem;
+}
+.requestGroups h2 {
+  margin-bottom: 0.75rem;
+}
+.requestCard h3 {
   font-size: 1.3rem;
 }
 .requestCard p {
@@ -1609,47 +1593,11 @@
     padding: 0;
     gap: 0.65rem;
   }
-  .heroDirectHelp {
-    display: inline-flex;
-    gap: 0.4rem;
-    align-items: center;
-    color: var(--color-accent);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-top: 0.4rem;
-    text-underline-offset: 4px;
+  .heroLinks {
+    justify-content: flex-start;
   }
   .heroVisual {
     height: clamp(180px, 56vw, 250px);
-  }
-  .services {
-    width: auto;
-    grid-template-columns: 1fr;
-    margin: -0.75rem 1rem 0;
-    padding: 0.25rem 1.25rem;
-  }
-  .serviceChoice {
-    padding: 1.25rem 0;
-    border-left: 0;
-    gap: 0.8rem;
-  }
-  .serviceIcon {
-    width: 48px;
-    height: 48px;
-  }
-  .serviceChoice strong {
-    font-size: 1rem;
-  }
-  .serviceChoice div > span {
-    font-size: 0.8125rem;
-  }
-  .landingUrgent {
-    padding: 0 1.25rem;
-    margin: 1.5rem auto 2.5rem;
-  }
-  .landingUrgent::before,
-  .landingUrgent::after {
-    display: none;
   }
 
   .urgent {
@@ -1917,4 +1865,181 @@
   .infoIntro {
     gap: 1rem;
   }
+}
+
+
+.foodServices {
+  max-width: 76rem;
+  padding-top: clamp(1.5rem, 4vw, 3rem);
+}
+.foodGuide {
+  display: grid;
+  align-items: start;
+  gap: 0.875rem;
+  max-width: 45rem;
+}
+.shell .foodGuide > h1 {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  max-width: 27ch;
+  margin: 0;
+}
+.foodGuide .form {
+  margin: 0;
+}
+.foodGuide > .form {
+  gap: 0.75rem;
+}
+.foodUrgent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 1rem;
+  padding: 0.75rem 0;
+  border-block: 1px solid var(--color-rule);
+  font-size: 0.9rem;
+}
+.foodUrgent p {
+  color: var(--color-ink-muted);
+}
+.foodChoices {
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+}
+.foodChoices legend {
+  padding: 0;
+  margin-block-end: 0.65rem;
+  font-weight: 650;
+}
+.foodChoiceOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.foodChoiceOption {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+.foodChoiceOption:hover,
+.foodChoiceOption:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.foodChoiceOption input {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+.foodChoiceOption:has(input:focus-visible) {
+  border-color: transparent;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.foodChoiceOption:has(input:focus-visible) input:focus-visible {
+  outline: none;
+}
+.foodChoiceOption:has(input:disabled) {
+  cursor: default;
+  opacity: 0.65;
+}
+.foodGuide .foodDescription {
+  margin: 0;
+}
+@media (min-width: 850px) {
+  .foodGuide:has(> .descriptionSlot > .foodDescription) {
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(1.5rem, 4vw, 3rem);
+  }
+  .foodGuide > :is(h1, p, aside) {
+    grid-column: 1 / -1;
+  }
+  .foodGuide[data-describing] > .foodDescription {
+    grid-column: 1 / -1;
+    max-width: 44rem;
+  }
+}
+
+.foodChoiceList {
+  display: grid;
+  gap: 0.35rem;
+}
+.foodChoiceList .foodChoiceOption {
+  font-weight: 500;
+}
+.foodResults {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+.foodResults .quiet {
+  justify-self: start;
+}
+.foodResults .serviceOption {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  padding: 0.9rem 0 0;
+  border-top: 1px solid var(--color-rule);
+}
+.foodRecommendation {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+  padding: 1rem;
+  background: var(--color-paper-secondary);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+.startFlow {
+  display: grid;
+  max-width: 34rem;
+  margin-inline: auto;
+  gap: 1rem;
+}
+.simpleStart,
+.startFollowUp {
+  display: grid;
+  gap: 1rem;
+}
+.startFlow > h1 {
+  margin: 0;
+}
+.simpleStart .form {
+  margin: 0;
+}
+.simpleStart .foodChoiceOptions {
+  max-width: 16rem;
+}
+.simpleStart input[autocomplete="postal-code"] {
+  max-width: 12rem;
+}
+.simpleStart textarea {
+  min-height: 6rem;
+}
+.startPrivacy {
+  font-size: 0.875rem;
+  margin-block-start: 0.65rem;
+  color: var(--color-ink-muted);
+}
+.startPrivacy summary {
+  cursor: pointer;
+}
+.startPrivacy p {
+  margin-block: 0.65rem;
+}
+.descriptionSlot {
+  min-width: 0;
 }

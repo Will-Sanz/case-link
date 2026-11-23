@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, MapPin } from "iconoir-react";
 import { foodSiteDayLabels } from "@/lib/parent/food-access-alternatives";
 import type { FoodSiteResult } from "@/lib/parent/food-sites";
+import { getProgram } from "@/lib/parent/programs";
 import { displayDate } from "./api";
 import { ParentLoading, ServiceError } from "./feedback";
 import { useParentResource } from "./use-parent-resource";
@@ -101,9 +102,10 @@ function FoodSiteResults({ zip }: { zip: string }) {
   );
 }
 
-export function FoodSites({ zip }: { zip?: string }) {
+export function FoodSites({ zip, initialZip }: { zip?: string; initialZip?: string }) {
   const { locale, t } = useParentLocale();
-  const [draft, setDraft] = useState("");
+  const pennsylvaniaWic = getProgram("wic-pa");
+  const [draft, setDraft] = useState(initialZip ?? "");
   const [searchZip, setSearchZip] = useState("");
   const selectedZip = zip ?? searchZip;
   const [error, setError] = useState("");
@@ -167,13 +169,15 @@ export function FoodSites({ zip }: { zip?: string }) {
         <ArrowRight width={16} height={16} aria-hidden="true" />
       </a>
       <details className={styles.resourceDetails}>
-        <summary>{t("More food options and a no-paperwork fridge")}</summary>
+        <summary>{t("More food and WIC resources")}</summary>
         <p>{t("Share Community Fridge & Pantry is outside 2901 W. Hunting Park Avenue, Philadelphia. Share publishes 24-hour access without paperwork. Food depends on donations; stock is unknown and nothing is reserved.")}</p>
         <p className={styles.hint}>{t("Share source reviewed November 17, 2026. Check the operator’s current instructions before traveling. Other fridges can have different hours. No delivery, interpreter or physical-access arrangement is confirmed.")}</p>
         <div className={styles.serviceLinks}>
           <a className={styles.textLink} href="https://www.sharefoodprogram.org/community-fridges/">{t("Read Share’s fridge access instructions")}</a>
           <a className={styles.textLink} href="https://www.sharefoodprogram.org/find-food/">{t("Open Share’s food finder")}</a>
-          <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food">{t("Find a food bank outside this area")}</a>
+          <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food">{t("Feeding America’s food bank finder")}</a>
+          <a className={styles.textLink} href="https://www.feedingamerica.org/need-help-find-food/wic">{t("Feeding America’s WIC guide")}</a>
+          {pennsylvaniaWic && <a className={styles.textLink} href={pennsylvaniaWic.officialUrl}>{t("Request a Pennsylvania WIC appointment")}</a>}
         </div>
         <p>{t("Some finder locations offer delivery only. Check each service’s rules; a warehouse address is not a walk-in food site. If one visit does not work out, use the City or Share finder for another option. A listing or a visit does not mean food was received.")}</p>
       </details>

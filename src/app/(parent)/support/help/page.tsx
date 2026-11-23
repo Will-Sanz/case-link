@@ -27,9 +27,8 @@ export default async function HelpPage() {
   return (
     <div lang={locale} className={`${styles.container} ${styles.infoPage} ${infoStyles.page}`}>
       <header className={styles.infoIntro}>
-      <h1>{t("Help, without another hurdle.")}</h1>
-      <p className={styles.lead}>
-        {t("You can use official programs directly at any time. You do not need to create a CaseLink account or upload a document first.")}</p>
+        <h1>{t("Help, without another hurdle.")}</h1>
+        <p className={styles.lead}>{t("You can use official programs directly at any time. You do not need to create a CaseLink account or upload a document first.")}</p>
       </header>
       <section id="urgent" className={styles.section}>
         <h2>{t("Need food or utility help now?")}</h2>
@@ -70,22 +69,7 @@ export default async function HelpPage() {
       <div className={styles.section}>
         <FoodSites />
       </div>
-      <section className={`${styles.section} ${styles.infoWide}`}>
-        <h2>{t("Official programs & partner options")}</h2>
-        <ul className={`${styles.list} ${styles.programDirectory}`}>
-          {PROGRAMS.map((program) => (
-            <li className={styles.needRow} key={program.id}>
-              <h3 lang={locale === "es" && t(program.name) === program.name ? "en" : undefined}>
-                <a className={styles.textLink} href={program.officialUrl}>
-                  {t(program.name)}
-                </a>
-              </h3>
-              <p lang={locale === "es" && t(program.description) === program.description ? "en" : undefined}>{t(program.description)}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section className={styles.section}>
+      <section id="account-help" className={styles.section}>
         <h2>{t("Can’t sign in?")}</h2>
         {existingAccounts && (
           <p>
@@ -105,6 +89,21 @@ export default async function HelpPage() {
           {t("Never share your password or codes. If you no longer have access to your email, CaseLink does not currently provide an automatic account transfer; contact the program directly for time-sensitive support.")}</p>
         <Link className={styles.secondary} href="/sign-in">
           {t("Return to sign in")}</Link>
+      </section>
+      <section className={`${styles.section} ${styles.infoWide}`}>
+        <h2>{t("Official programs & partner options")}</h2>
+        <ul className={`${styles.list} ${styles.programDirectory}`}>
+          {PROGRAMS.map((program) => (
+            <li className={styles.needRow} key={program.id}>
+              <h3 lang={locale === "es" && t(program.name) === program.name ? "en" : undefined}>
+                <a className={styles.textLink} href={program.officialUrl}>
+                  {t(program.name)}
+                </a>
+              </h3>
+              <p lang={locale === "es" && t(program.description) === program.description ? "en" : undefined}>{t(program.description)}</p>
+            </li>
+          ))}
+        </ul>
       </section>
       <section className={styles.section}>
         <h2>{t("Something changed?")}</h2>

@@ -98,6 +98,13 @@ describe("recorded form downloads", () => {
     expect(screen.queryByText(/not submitted/)).toBeNull();
     expect(screen.getByRole("link", { name: "Download incomplete unsigned draft" })).toBeTruthy();
   });
+  it("shows the recorded reference, source and exact timestamp on the receipt list", () => {
+    const recordedAt = "2026-11-06T21:30:00Z";
+    renderOperation({ state: "agency_submitted", evidence: { source: "agency_receipt", reference: "SAMPLE-RECEIPT", recordedAt } });
+    expect(screen.getByText("SAMPLE-RECEIPT")).toBeTruthy();
+    const attribution = screen.getByText(/Agency receipt/);
+    expect(attribution.querySelector("time")?.dateTime).toBe(recordedAt);
+  });
   it("labels the exact protected SNAP application without creating an ordinary form download", () => {
     renderOperation({ need: "snap_new", action: "submit", artifact_id: null, protected_packet: fixtureProtectedSnapOperation().packet.protectedSnapPacket });
     expect(screen.getByText(/SNAP application prepared · not submitted/)).toBeTruthy();

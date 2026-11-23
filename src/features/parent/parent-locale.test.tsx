@@ -6,15 +6,19 @@ import { ParentSignIn } from "./sign-in";
 import { PARENT_LOCALE_COOKIE } from "@/lib/parent/locale";
 import { ParentLoading } from "./feedback";
 import { ParentShell } from "./parent-shell";
-const { refresh, replace } = vi.hoisted(() => ({ refresh: vi.fn(), replace: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, replace }), usePathname: () => "/get-support" }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); document.cookie = `${PARENT_LOCALE_COOKIE}=; Path=/; Max-Age=0`; document.documentElement.lang = "en"; });
+const { refresh, replace, usePathname } = vi.hoisted(() => ({ refresh: vi.fn(), replace: vi.fn(), usePathname: vi.fn(() => "/sign-in") }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, replace }), usePathname }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); usePathname.mockReturnValue("/sign-in"); window.history.replaceState(null, "", "/"); document.cookie = `${PARENT_LOCALE_COOKIE}=; Path=/; Max-Age=0`; document.documentElement.lang = "en"; });
 function Probe() { const { t } = useParentLocale(); return <h1>{t("Get support")}</h1>; }
-it("marks unfinished body as English while translated sign-in and assistant use Spanish", () => {
-  render(<ParentLocaleProvider initialLocale="es"><ParentShell><h1>Household ZIP code</h1><ParentSignIn emailCodeAvailable={false} /></ParentShell></ParentLocaleProvider>);
+it("marks unfinished body as English and localizes sign-in and the assistant where available", () => {
+  const shell = <ParentLocaleProvider initialLocale="es"><ParentShell><h1>Household ZIP code</h1><ParentSignIn emailCodeAvailable={false} /></ParentShell></ParentLocaleProvider>;
+  const view = render(shell);
   expect(screen.getByText("Household ZIP code").closest("[lang]")?.getAttribute("lang")).toBe("en");
   expect(screen.getByLabelText("Su dirección de correo electrónico").closest("[lang]")?.getAttribute("lang")).toBe("es");
   expect(screen.getByRole("button", { name: "Pedir ayuda a CaseLink" }).closest("[lang]")?.getAttribute("lang")).toBe("es");
+  usePathname.mockReturnValue("/get-support");
+  view.rerender(<ParentLocaleProvider initialLocale="es"><ParentShell><Probe /></ParentShell></ParentLocaleProvider>);
+  expect(screen.queryByRole("button", { name: "Pedir ayuda a CaseLink" })).toBeNull();
 });
 it("translates both the accessible loading name and its hidden text", () => {
   render(<ParentLocaleProvider initialLocale="es"><ParentLoading /></ParentLocaleProvider>);

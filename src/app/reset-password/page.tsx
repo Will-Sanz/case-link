@@ -11,16 +11,19 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
   const isSetup = params.mode === "setup";
   const requestedLocale = explicitParentLocale(params.ui);
   const locale = requestedLocale ?? (process.env.CASELINK_PRODUCT === "parent" ? await readParentLocale() : "en");
+  const parentRecovery = process.env.CASELINK_PRODUCT === "parent" || !!requestedLocale;
   const t = (english: string) => parentText(locale, english);
+  const title = isSetup ? "Set your password" : "Reset password";
   return (
-    <ParentRecoveryLocale requestedLocale={requestedLocale}><AuthShell
-      title="CaseLink"
-      subtitle={t("Set a new password to secure your account.")}
-    >
-      <h2 className="text-base font-semibold text-[var(--public-ink)]">{t(isSetup ? "Set your password" : "Reset password")}</h2>
-      <div className="mt-5">
-        <ResetPasswordForm />
-      </div>
-    </AuthShell></ParentRecoveryLocale>
+    <ParentRecoveryLocale requestedLocale={requestedLocale}>
+      <AuthShell
+        recovery={parentRecovery}
+        title={parentRecovery ? title : "CaseLink"}
+        subtitle={t("Set a new password to secure your account.")}
+      >
+        {!parentRecovery && <h2 className="text-base font-semibold text-[var(--public-ink)]">{t(title)}</h2>}
+        <div className={parentRecovery ? undefined : "mt-5"}><ResetPasswordForm /></div>
+      </AuthShell>
+    </ParentRecoveryLocale>
   );
 }

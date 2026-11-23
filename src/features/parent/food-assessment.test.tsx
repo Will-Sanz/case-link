@@ -14,8 +14,31 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 const renderGuide = (children: ReactNode) => render(<ParentLocaleProvider initialLocale="en"><header><ParentLanguageSelector /></header>{children}</ParentLocaleProvider>);
 beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-function answer(label: RegExp, value: string) { fireEvent.change(screen.getByLabelText(label), { target: { value } }); }
+function foodGroup() { return screen.getByRole("group", { name: /enough food|suficiente comida/ }); }
+function foodChoice(value = "yes") { return foodGroup().querySelector<HTMLInputElement>(`input[value="${value}"]`)!; }
+function choice(label: RegExp, value?: string) {
+  return screen.getByRole("group", { name: label }).querySelector<HTMLInputElement>(value ? `input[value="${value}"]` : "input")!;
+}
+function answer(label: RegExp, value: string) {
+  fireEvent.click(choice(label, value));
+}
 describe("public guided food entry", () => {
+  it("offers all three answers as one unselected group and keeps an explicit unsure answer", () => {
+    renderGuide(<FoodAssessment />);
+    expect([...foodGroup().querySelectorAll("input")].map(option => option.value)).toEqual(["yes", "no", "not_sure"]);
+    expect(foodGroup().querySelector(":checked")).toBeNull();
+    fireEvent.click(foodChoice("not_sure"));
+    expect(foodChoice("not_sure").checked).toBe(true);
+  });
+  it("opens and focuses benefit history when it is necessary to suggest a path", async () => {
+    renderGuide(<FoodAssessment />);
+    fireEvent.click(foodChoice("yes"));
+    fireEvent.click(screen.getByRole("button", { name: "See my options" }));
+    const firstBenefitChoice = choice(/help paying/, "never");
+    await waitFor(() => expect(document.activeElement).toBe(firstBenefitChoice));
+    expect(firstBenefitChoice.checked).toBe(false);
+    expect(firstBenefitChoice.required).toBe(true);
+  });
   it.each(["en", "es"] as const)("offers both compatible food and pending SNAP paths in one handoff in %s", language => {
     const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose} />);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } });
@@ -39,12 +62,12 @@ describe("public guided food entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Your proposed next steps" })));
     fireEvent.click(screen.getByRole("button", { name: "Change my answers" }));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/enough food/)));
+    await waitFor(() => expect(document.activeElement).toBe(foodChoice("no")));
   });
   it.each(["en", "es"])("lets someone whose benefits ended answer honestly in %s", language => {
     renderGuide(<FoodAssessment />);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } });
-    expect(screen.getByRole("option", { name: language === "en" ? /received it before/ : /la recibí antes/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: language === "en" ? /received it before/ : /la recibí antes/ })).toBeTruthy();
     answer(language === "en" ? /enough food/ : /suficiente comida/, "yes");
     answer(language === "en" ? /help paying/ : /ayuda para comprar/, "receiving");
     answer(language === "en" ? /What has happened/ : /Qué ha ocurrido/, "stopped");
@@ -71,8 +94,8 @@ describe("public guided food entry", () => {
     expect(screen.getByRole("link", { name: "Renew SNAP" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Change my answers" }));
     answer(/help paying/, "not_sure");
-    expect(screen.queryByLabelText(/What has happened/)).toBeNull();
-    expect((screen.getByLabelText(/enough food/) as HTMLSelectElement).value).toBe("no");
+    expect(screen.queryByRole("group", { name: /What has happened/ })).toBeNull();
+    expect(foodChoice("no").checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     expect(screen.queryByRole("link", { name: "Renew SNAP" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Apply for SNAP" })).toBeNull();
@@ -92,9 +115,9 @@ describe("public guided food entry", () => {
     const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose} />);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } });
     const label = language === "en" ? "I applied and received a denial notice" : "Presenté una solicitud y recibí un aviso de denegación";
-    expect(screen.getByRole("option", { name: label })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: label })).toBeTruthy();
     answer(/enough food|suficiente comida/, "yes"); answer(/help paying|ayuda para comprar/, "denied");
-    expect(screen.queryByLabelText(/What has happened|Qué ha ocurrido/)).toBeNull();
+    expect(screen.queryByRole("group", { name: /What has happened|Qué ha ocurrido/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: language === "en" ? "See my options" : "Ver mis opciones" }));
     expect(screen.getByText(language === "en" ? /denial notice for your SNAP application/ : /aviso de denegación de su solicitud de SNAP/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: language === "en" ? "Help with SNAP benefits" : "Ayuda con los beneficios de SNAP" }));
@@ -106,8 +129,8 @@ describe("public guided food entry", () => {
     const onChoose = vi.fn(), remembered = vi.spyOn(foodDescriptionRoutingAnswersSchema, "parse"); renderGuide(<FoodAssessment onChoose={onChoose} />);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } });
     answer(/help paying|ayuda para comprar/, benefit);
-    const enough = screen.getByLabelText(/enough food|suficiente comida/) as HTMLSelectElement;
-    expect(enough.value).toBe(""); expect(enough.required).toBe(false);
+    const enough = foodChoice();
+    expect(foodGroup().querySelector(":checked")).toBeNull(); expect(enough.required).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: language === "en" ? "See my options" : "Ver mis opciones" }));
     const need = benefit === "never" ? "snap_new" : benefit === "applied" ? "snap_pending" : "snap_problem";
     const titles = language === "en" ? { snap_new: "Apply for SNAP", snap_pending: "Check a pending application", snap_problem: "Help with SNAP benefits" } : { snap_new: "Solicitar SNAP", snap_pending: "Consultar una solicitud pendiente", snap_problem: "Ayuda con los beneficios de SNAP" };
@@ -117,13 +140,13 @@ describe("public guided food entry", () => {
     expect(onChoose).toHaveBeenCalledExactlyOnceWith({ needs: [need], answers: { foodForTwoDays: "not_sure", benefitHistory: benefit, existingIssue: null } });
     expect(remembered).toHaveBeenCalledOnce(); expect(remembered.mock.calls[0][0]).not.toHaveProperty("foodForTwoDays");
     fireEvent.click(screen.getByRole("button", { name: language === "en" ? "Change my answers" : "Cambiar mis respuestas" }));
-    expect((screen.getByLabelText(/enough food|suficiente comida/) as HTMLSelectElement).value).toBe("");
+    expect(foodGroup().querySelector(":checked")).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
   it.each(["en", "es"])("continues only food while SNAP history is unanswered in %s", language => {
     const onChoose = vi.fn(), remembered = vi.spyOn(foodDescriptionRoutingAnswersSchema, "parse"); renderGuide(<FoodAssessment onChoose={onChoose} />);
     fireEvent.change(screen.getByLabelText(/Screen language|Idioma de pantalla/), { target: { value: language } }); answer(/enough food|suficiente comida/, "no");
-    expect((screen.getByLabelText(/help paying|ayuda para comprar/) as HTMLSelectElement).required).toBe(false);
+    expect(choice(/help paying|ayuda para comprar/).required).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: language === "en" ? "See my options" : "Ver mis opciones" }));
     expect(screen.queryByRole("button", { name: /Continue with both|Continuar con ambas/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: language === "en" ? "Food for now" : "Comida para ahora" }));
@@ -133,7 +156,7 @@ describe("public guided food entry", () => {
   it("continues only food while a receiving-benefits issue is unanswered without inventing a problem fact", () => {
     const onChoose = vi.fn(), remembered = vi.spyOn(foodDescriptionRoutingAnswersSchema, "parse"); renderGuide(<FoodAssessment onChoose={onChoose} />);
     answer(/enough food/, "no"); answer(/help paying/, "receiving");
-    expect((screen.getByLabelText(/What has happened/) as HTMLSelectElement).required).toBe(false);
+    expect(choice(/What has happened/).required).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     expect(screen.queryByRole("button", { name: "Help with SNAP benefits" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Food for now" }));
@@ -142,14 +165,14 @@ describe("public guided food entry", () => {
   });
   it.each(["renewal", "card"])("continues a known receiving %s SNAP route while food is unanswered", issue => {
     const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose} />); answer(/help paying/, "receiving"); answer(/What has happened/, issue);
-    expect((screen.getByLabelText(/enough food/) as HTMLSelectElement).required).toBe(false);
+    expect(foodChoice().required).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     fireEvent.click(screen.getByRole("button", { name: issue === "renewal" ? "Renew SNAP" : "Help with SNAP benefits" }));
     expect(onChoose).toHaveBeenCalledExactlyOnceWith({ needs: [issue === "renewal" ? "snap_renewal" : "snap_problem"], answers: { foodForTwoDays: "not_sure", benefitHistory: "receiving", existingIssue: issue } });
   });
   it.each(["", "none"])("keeps all unavailable work closed when receiving issue is %s and food is unanswered", issue => {
     const onChoose = vi.fn(); renderGuide(<FoodAssessment onChoose={onChoose} />); answer(/help paying/, "receiving"); if (issue) answer(/What has happened/, issue);
-    expect((screen.getByLabelText(/enough food/) as HTMLSelectElement).required).toBe(true);
+    expect(foodChoice().required).toBe(true);
     fireEvent.submit(screen.getByRole("button", { name: "See my options" }).closest("form")!);
     expect(screen.queryByRole("heading", { name: "Your proposed next steps" })).toBeNull(); expect(onChoose).not.toHaveBeenCalled();
   });
@@ -163,8 +186,8 @@ describe("public guided food entry", () => {
   });
   it("keeps the description question's required-field default unchanged", () => {
     renderGuide(<FoodAssessmentQuestions answers={{ foodForTwoDays: "", benefitHistory: "never", existingIssue: null }} questionIds={["foodForTwoDays"]} onChange={vi.fn()} />);
-    expect((screen.getByLabelText(/enough food/) as HTMLSelectElement).required).toBe(true);
-    expect(screen.getByLabelText(/enough food/).getAttribute("aria-describedby")).toBeNull();
+    expect(foodChoice().required).toBe(true);
+    expect(foodGroup().getAttribute("aria-describedby")).toBeNull();
   });
 
   it.each(["food", "snap"])("sends the real parent-intake %s preflight for only the ready need with honest unknown representation", async mode => {
@@ -182,7 +205,7 @@ describe("public guided food entry", () => {
       if (init?.method === "POST") throw new Error("Unexpected synthetic mutation");
       return json({ capabilities: [] });
     }));
-    renderGuide(<ParentIntake initialNeed="food" />); await screen.findByLabelText(/enough food/);
+    renderGuide(<ParentIntake initialNeed="food" />); await screen.findByRole("group", { name: /enough food/ });
     if (mode === "food") answer(/enough food/, "no"); else answer(/help paying/, "denied");
     fireEvent.click(screen.getByRole("button", { name: "See my options" }));
     fireEvent.click(screen.getByRole("button", { name: mode === "food" ? "Food for now" : "Help with SNAP benefits" }));

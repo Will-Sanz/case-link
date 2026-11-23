@@ -379,18 +379,17 @@ describe("one coherent upfront support intake", () => {
     render(<ParentIntake initialNeed={need}/>);fireEvent.change(await screen.findByLabelText('Household ZIP code'),{target:{value:'19104'}});fireEvent.click(screen.getByLabelText(/I’m 18 or older/));fireEvent.click(screen.getByRole('button',{name:'Continue'}));
     expect(screen.queryByText('Permitted actions available')).toBeNull();expect(screen.getAllByText('Prepare only · nothing sent').length).toBeGreaterThan(0);
   });
-  it("offers separate food services without requiring sign-in or collecting household answers", async () => {
-    render(<ParentIntake initialNeed="food" />);
-    expect(screen.getByRole("link", { name: "Find food now" }).getAttribute("href")).toBe("https://www.phila.gov/food/");
-    expect(screen.getByRole("link", { name: "Apply for SNAP" }).getAttribute("href")).toBe("/get-support?need=snap_new");
-    expect(screen.getByRole("link", { name: "Check a pending application" }).getAttribute("href")).toBe("/get-support?need=snap_pending");
-    expect(screen.getByRole("link", { name: "Renew SNAP" }).getAttribute("href")).toBe("/get-support?need=snap_renewal");
-    expect(screen.getByRole("link", { name: "Apply for WIC" }).getAttribute("href")).toBe("/get-support?need=wic_new");
-    expect(screen.getByRole("link", { name: /Not sure, or need more than one/ }).getAttribute("href")).toBe("/get-support?need=all");
+  it("starts with only the minimum fields and asks for a support category after a blank description", async () => {
+    render(<ParentIntake initialNeed="food" simpleStart />);
+    expect(screen.getByRole("link", { name: "Find urgent food or utility help" }).getAttribute("href")).toBe("/support/help#urgent");
+    expect(screen.queryByText("I already know which program I need")).toBeNull();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.queryByLabelText("Household ZIP code")).toBeNull();
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(fetch).mock.calls.every(([url, init]) => String(url).startsWith("/api/parent/food-description") && !init?.method && !init?.body)).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: "Yes" }));
+    fireEvent.change(screen.getByLabelText("ZIP code"), { target: { value: "19129" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find support" }));
+    await screen.findByRole("heading", { name: "What kind of help do you need?" });
+    expect(screen.getByLabelText("Philadelphia ZIP code")).toHaveProperty("value", "19129");
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method && !init?.body)).toBe(true);
   });
   it("still requires an explicit choice in the combined support form", async () => {
     render(<ParentIntake />);

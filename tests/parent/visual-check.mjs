@@ -314,21 +314,19 @@ try {
             .getByRole("banner")
             .getByRole("link", { name: "CaseLink home" })
             .boundingBox();
-          const services = await page
-            .getByRole("region", { name: "Choose your support" })
+          const start = await page
+            .getByRole("link", { name: "Find support for my family" })
             .boundingBox();
           const panorama = await art.boundingBox();
           assert.ok(
             heading &&
               brand &&
-              services &&
-              Math.abs(heading.x - brand.x) < 2 &&
-              Math.abs(heading.x - services.x) < 2,
-            "Homepage heading, header and support sheet must share their desktop alignment.",
+              Math.abs(heading.x - brand.x) < 2,
+            "Homepage heading and header must share their desktop alignment.",
           );
           assert.ok(
-            services.y + services.height <= height,
-            "The food support choice must fit in the initial desktop viewport.",
+            start && start.y + start.height <= height,
+            "The start action must fit in the initial desktop viewport.",
           );
           assert.ok(
             panorama && panorama.height <= 400 && panorama.width <= 1600,
