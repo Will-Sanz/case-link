@@ -8,6 +8,20 @@ Current advertised alternatives are [OVHcloud VPS-1](https://us.ovhcloud.com/vps
 
 Access still needed: owner-controlled account/billing for the selected host and SSH public key; authority for the proposed `pilot.thecaselink.com` DNS record and TLS; access to the original approved Supabase project; scoped database/S3/model/carrier credentials delivered outside Git. The approved project is `zpfypkizsapvsxeykmdq`, not the different project returned by the currently connected Supabase account. Its current region, status, IPv6 reachability and grants must be verified with authorized metadata access before installation. Never substitute another project, restore one, migrate school records or change recovery configuration to make this package run.
 
+## Publish a web-only update from GitHub
+
+Run **Deploy CaseLink to Azure** from protected `main` with `operation=deploy` after merging the reviewed update.
+
+```sh
+gh workflow run deploy-azure-web.yml --ref main -f operation=deploy
+```
+
+The default `check` only checks public HTTPS health and uses no Azure token. Explicit `connect` exercises GitHub sign-in, the VM-scoped permission and a read-only host inspection. `deploy` requires successful CI and CodeQL push runs for the selected commit, packages exactly that source, stages and type-checks it within the existing memory limit, and switches only the web service. It verifies the exact public build and the desktop and phone journeys. The previous healthy build is restored when the new build fails the cutover or browser checks.
+
+The protected `caselink-azure-web` GitHub environment admits `main` only. Its three Azure identifier variables select a dedicated federated managed identity. GitHub receives short-lived Azure tokens. The identity can read the CaseLink VM and write and read Managed Run Command on that one VM. Run Command executes as root on the target, so review changes to this workflow and the host script as privileged production code.
+
+Use the coordinated release process for data migrations, processing changes and non-web services. If Azure accepts a command but its completion is unclear, inspect the `caselink-github-web` command on the VM before retrying. The workflow preserves the prior release and keeps deployment diagnostics on the host.
+
 ## Process boundaries
 
 | Service account / profile | Ingress and authority |
