@@ -15,13 +15,15 @@ test "$(systemctl show "$unit" --property=User --value)" = caselink-web
 test "$(stat -c '%U:%a' "$profile")" = caselink-web:600
 systemctl show "$unit" --property=ExecStart --value | python3 -c 'import re,sys; a=re.search(r"argv\[\]=([^;]+)",sys.stdin.read()); assert a and a.group(1).split() == ["/usr/bin/node","--import","tsx","scripts/parent-hosted-services.ts","/etc/caselink/web/profile.json"]'
 
-healthy_build() {
+matches_build() {
   local build=$1 body
+  curl -fsS --max-time 3 http://127.0.0.1:3100/api/health >/dev/null &&
+    body=$(curl -fsS --max-time 5 "$origin/get-support?release=$build") && [[ "$body" == *"$build"* ]]
+}
+
+healthy_build() {
   for _ in {1..20}; do
-    if curl -fsS --max-time 3 http://127.0.0.1:3100/api/health >/dev/null &&
-      body=$(curl -fsS --max-time 5 "$origin/get-support?release=$build") && [[ "$body" == *"$build"* ]]; then
-      return 0
-    fi
+    if matches_build "$1"; then return 0; fi
     sleep 1
   done
   return 1
@@ -134,7 +136,9 @@ restore() {
   if [ "$current" = "$release" ] || [ "$reload" = 1 ]; then
     systemctl daemon-reload && test "$(active_release)" = "$previous" || return
   fi
-  if [ "$current" = "$release" ] && ! systemctl restart "$unit"; then
+  if [ "$current" = "$previous" ] && matches_build "$old_build"; then return 0; fi
+  test -f "$stage/dropin-path" || return
+  if ! systemctl restart "$unit"; then
     test "$(systemctl show "$unit" --property=Result --value)" = start-limit-hit &&
       systemctl reset-failed "$unit" && systemctl restart "$unit" || return
   fi

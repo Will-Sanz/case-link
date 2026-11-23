@@ -102,22 +102,27 @@ active_release() { cat "$stage/active"; }
 systemctl() {
   if [ "$1" = daemon-reload ]; then
     if [ -e "$candidate" ]; then printf '%s' "$release"; else printf '%s' "$previous"; fi > "$stage/active"
+  elif [ "$1" = restart ]; then
+    cp "$stage/active" "$stage/running"
   fi
 }
-healthy_build() { test "$1" = old-build && test "$(active_release)" = "$previous"; }
+matches_build() { test "$1" = old-build && test "$(cat "$stage/running")" = "$previous"; }
+healthy_build() { matches_build "$1" && test "$(active_release)" = "$previous"; }
 restore
 '''
             env = {**os.environ, "stage": temp, "dropdir": temp, "candidate": str(dropin),
                    "previous": "previous", "release": "candidate", "release_id": "abcdef012345",
                    "old_build": "old-build", "unit": "web"}
-            for active, exists in (("previous", True), ("candidate", False)):
-                with self.subTest(active=active, exists=exists):
+            for active, running, exists in (("previous", "previous", True), ("candidate", "candidate", False), ("previous", "candidate", False)):
+                with self.subTest(active=active, running=running, exists=exists):
                     (root / "active").write_text(active)
+                    (root / "running").write_text(running)
                     if exists:
                         dropin.write_text("owned candidate")
                     subprocess.run(["bash", "-e", "-c", restore + stub], env=env, check=True)
                     self.assertFalse(dropin.exists())
                     self.assertEqual((root / "active").read_text(), "previous")
+                    self.assertEqual((root / "running").read_text(), "previous")
             dropin.write_text("different contents")
             result = subprocess.run(["bash", "-e", "-c", restore + stub], env=env)
             self.assertNotEqual(result.returncode, 0)
