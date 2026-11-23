@@ -33,8 +33,11 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
 
-      - name: Verify exact-source release packaging and archive safety
-        run: python3 deploy/parent-vm/package-release.test.py
+      - name: Verify release packaging and Azure rollout guards
+        run: |
+          python3 deploy/parent-vm/package-release.test.py
+          python3 deploy/parent-vm/azure-web-release.test.py
+          bash -n deploy/parent-vm/azure-web-host.sh
 
       - name: Install PDF verification tools
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
