@@ -10,7 +10,7 @@ try {
     ['desktop', { viewport: { width: 1440, height: 960 } }],
     ['phone', devices['iPhone 13']],
   ]) {
-    const context = await browser.newContext({ ...options, locale: 'en-US' });
+    const context = await browser.newContext({ ...options, locale: 'en-US', serviceWorkers: 'block' });
     const page = await context.newPage();
     const mutations = [];
     const errors = [];

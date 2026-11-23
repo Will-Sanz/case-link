@@ -145,7 +145,11 @@ if [ "$operation" = reconcile ]; then
   exit 0
 fi
 if [ "$operation" = rollback ]; then
-  restore
+  if [ "$(active_release)" = "$previous" ]; then
+    healthy_build "$old_build"
+  else
+    restore
+  fi
   printf 'CASELINK %s %s\n' "$command_id" "$old_build"
   exit 0
 fi
