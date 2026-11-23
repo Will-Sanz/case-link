@@ -1,7 +1,9 @@
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -86,6 +88,40 @@ class DeploymentTest(unittest.TestCase):
             context = release.deploy("/virtual-machine", SHA, PREVIOUS, "old-build")
         self.assertEqual([call.args[1] for call in remote.call_args_list], ["stage", "activate"])
         self.assertEqual(context, {"sha": SHA, "previous": PREVIOUS, "release_id": remote.call_args.kwargs["release_id"], "build": "new-build", "old_build": "old-build"})
+
+    def test_restore_handles_interruption_on_each_side_of_systemd_reload(self):
+        source = (release.HERE / "azure-web-host.sh").read_text()
+        restore = source[source.index("restore() {"):source.index('if [ "$operation" = reconcile ]')]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            dropin = root / "zzzzzzzzz-www-test-abcdef012345.conf"
+            (root / "dropin-path").write_text(str(dropin))
+            (root / "dropin.conf").write_text("owned candidate")
+            stub = '''
+active_release() { cat "$stage/active"; }
+systemctl() {
+  if [ "$1" = daemon-reload ]; then
+    if [ -e "$candidate" ]; then printf '%s' "$release"; else printf '%s' "$previous"; fi > "$stage/active"
+  fi
+}
+healthy_build() { test "$1" = old-build && test "$(active_release)" = "$previous"; }
+restore
+'''
+            env = {**os.environ, "stage": temp, "dropdir": temp, "candidate": str(dropin),
+                   "previous": "previous", "release": "candidate", "release_id": "abcdef012345",
+                   "old_build": "old-build", "unit": "web"}
+            for active, exists in (("previous", True), ("candidate", False)):
+                with self.subTest(active=active, exists=exists):
+                    (root / "active").write_text(active)
+                    if exists:
+                        dropin.write_text("owned candidate")
+                    subprocess.run(["bash", "-e", "-c", restore + stub], env=env, check=True)
+                    self.assertFalse(dropin.exists())
+                    self.assertEqual((root / "active").read_text(), "previous")
+            dropin.write_text("different contents")
+            result = subprocess.run(["bash", "-e", "-c", restore + stub], env=env)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(dropin.read_text(), "different contents")
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ The default `check` only checks public HTTPS health and uses no Azure token. Exp
 
 The protected `caselink-azure-web` GitHub environment admits `main` only. Its three Azure identifier variables select a dedicated federated managed identity. GitHub receives short-lived Azure tokens. The identity can read the CaseLink VM and write and read Managed Run Command on that one VM. Run Command executes as root on the target, so review changes to this workflow and the host script as privileged production code.
 
-Use the coordinated release process for data migrations, processing changes and non-web services. If Azure accepts a command but its completion is unclear, inspect the `caselink-github-web` command on the VM before retrying. The workflow preserves the prior release and keeps deployment diagnostics on the host.
+Use the coordinated release process for data migrations, processing changes and non-web services. If a run stops before reporting the cutover outcome, inspect the `caselink-github-web` command on the VM before retrying. The workflow preserves the prior release and keeps deployment diagnostics on the host.
 
 ## Process boundaries
 

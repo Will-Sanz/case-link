@@ -118,14 +118,23 @@ old_build=$(build_of "$previous")
 new_build=$(build_of "$release")
 dropdir=/etc/systemd/system/caselink-parent@web.service.d
 restore() {
-  local dropin
-  dropin=$(cat "$stage/dropin-path") || return
-  [[ "$dropin" == "$dropdir"/zzzzzzzzz-www-*"-$release_id.conf" ]] &&
-  test "$(active_release)" = "$release" &&
-  cmp -- "$dropin" "$stage/dropin.conf" &&
-  rm -- "$dropin" &&
-  systemctl daemon-reload && test "$(active_release)" = "$previous" || return
-  if ! systemctl restart "$unit"; then
+  local current dropin reload=0
+  current=$(active_release) || return
+  [[ "$current" == "$previous" || "$current" == "$release" ]] || return 1
+  if [ -f "$stage/dropin-path" ]; then
+    dropin=$(cat "$stage/dropin-path") || return
+    [[ "$dropin" == "$dropdir"/zzzzzzzzz-www-*"-$release_id.conf" ]] || return 1
+    if [ -e "$dropin" ] || [ -L "$dropin" ]; then
+      test ! -L "$dropin" && cmp -- "$dropin" "$stage/dropin.conf" && rm -- "$dropin" || return
+      reload=1
+    fi
+  elif [ "$current" = "$release" ]; then
+    return 1
+  fi
+  if [ "$current" = "$release" ] || [ "$reload" = 1 ]; then
+    systemctl daemon-reload && test "$(active_release)" = "$previous" || return
+  fi
+  if [ "$current" = "$release" ] && ! systemctl restart "$unit"; then
     test "$(systemctl show "$unit" --property=Result --value)" = start-limit-hit &&
       systemctl reset-failed "$unit" && systemctl restart "$unit" || return
   fi
@@ -133,11 +142,9 @@ restore() {
 }
 if [ "$operation" = reconcile ]; then
   current=$(active_release)
-  if [ "$current" = "$previous" ] && healthy_build "$old_build"; then
-    printf 'CASELINK %s previous %s\n' "$command_id" "$old_build"
-  elif [ "$current" = "$release" ] && test -f "$stage/activated" && test "$(cat "$stage/activated")" = "$new_build" && healthy_build "$new_build"; then
+  if [ "$current" = "$release" ] && test -f "$stage/activated" && test "$(cat "$stage/activated")" = "$new_build" && healthy_build "$new_build"; then
     printf 'CASELINK %s activated %s\n' "$command_id" "$new_build"
-  elif [ "$current" = "$release" ] && restore; then
+  elif restore; then
     printf 'CASELINK %s previous %s\n' "$command_id" "$old_build"
   else
     printf 'CASELINK %s unverified\n' "$command_id"
@@ -145,11 +152,7 @@ if [ "$operation" = reconcile ]; then
   exit 0
 fi
 if [ "$operation" = rollback ]; then
-  if [ "$(active_release)" = "$previous" ]; then
-    healthy_build "$old_build"
-  else
-    restore
-  fi
+  restore
   printf 'CASELINK %s %s\n' "$command_id" "$old_build"
   exit 0
 fi
@@ -175,12 +178,7 @@ rollback_on_error() {
   local status=$?
   trap - EXIT
   if [ "$status" -ne 0 ] && cmp -s "$override" "$stage/dropin.conf"; then
-    if [ "$(active_release)" = "$release" ]; then
-      if restore; then printf 'Restored the previous healthy build.\n' >&2; else printf 'Rollback could not be verified.\n' >&2; fi
-    elif [ "$(active_release)" = "$previous" ]; then
-      rm -- "$override"
-      systemctl daemon-reload
-    fi
+    if restore; then printf 'Restored the previous healthy build.\n' >&2; else printf 'Rollback could not be verified.\n' >&2; fi
   fi
   exit "$status"
 }
