@@ -136,6 +136,9 @@ jobs:
   parent-native-security:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: ../parent-native-source
     env:
       DO_NOT_TRACK: "1"
       CASELINK_PARENT_SQL_FIXTURE_MODULE: ""
@@ -148,6 +151,14 @@ jobs:
         with:
           node-version: "24"
           cache: npm
+
+      - name: Stage the separate native rehearsal source
+        working-directory: .
+        run: |
+          fixture_dir="$GITHUB_WORKSPACE/../parent-native-source"
+          mkdir "$fixture_dir"
+          git archive HEAD | tar -x -C "$fixture_dir"
+          node scripts/stage-parent-native-form-fixtures.mjs "$fixture_dir"
 
       - name: Install dependencies and the pinned local service CLI
         run: |
